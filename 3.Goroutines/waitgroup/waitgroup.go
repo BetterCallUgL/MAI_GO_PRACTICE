@@ -6,11 +6,19 @@ package waitgroup
 // runs and calls Done when finished. At the same time,
 // Wait can be used to block until all goroutines have finished.
 type WaitGroup struct {
+	cnt   int
+	done  chan struct{}
+	mutex chan struct{}
 }
 
 // New creates WaitGroup.
 func New() *WaitGroup {
-	return nil
+	var wg WaitGroup
+	wg.cnt = 0
+	wg.done = nil
+	wg.mutex = make(chan struct{}, 1)
+	wg.mutex <- struct{}{}
+	return &wg
 }
 
 // Add adds delta, which may be negative, to the WaitGroup counter.
@@ -27,15 +35,25 @@ func New() *WaitGroup {
 // new Add calls must happen after all previous Wait calls have returned.
 // See the WaitGroup example.
 func (wg *WaitGroup) Add(delta int) {
-
+	<-wg.mutex
+	if wg.cnt == 0 {
+		wg.done = make(chan struct{})
+	}
+	wg.cnt += delta
+	if wg.cnt == 0 {
+		close(wg.done)
+	} else if wg.cnt < 0 {
+		panic("negative WaitGroup counter")
+	}
+	wg.mutex <- struct{}{}
 }
 
 // Done decrements the WaitGroup counter by one.
 func (wg *WaitGroup) Done() {
-
+	wg.Add(-1)
 }
 
 // Wait blocks until the WaitGroup counter is zero.
 func (wg *WaitGroup) Wait() {
-
+	<-wg.done
 }
