@@ -2,11 +2,14 @@ package once
 
 // Once describes an object that will perform exactly one action.
 type Once struct {
+	done chan bool
 }
 
 // New creates Once.
 func New() *Once {
-	return nil
+	done := make(chan bool, 1)
+	done <- true
+	return &Once{done}
 }
 
 // Do calls the function f if and only if Do is being called for the
@@ -26,5 +29,15 @@ func New() *Once {
 // If f panics, Do considers it to have returned; future calls of Do return
 // without calling f.
 func (o *Once) Do(f func()) {
-
+	flag := <-o.done
+	if flag {
+		defer func() {
+			if r := recover(); r != nil {
+				o.done <- false
+				panic(r)
+			}
+		}()
+		f()
+	}
+	o.done <- false
 }
