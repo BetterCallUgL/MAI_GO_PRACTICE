@@ -14,12 +14,18 @@ type Locker interface {
 // which must be held when changing the condition and
 // when calling the Wait method.
 type Cond struct {
-	L Locker
+	ch     chan struct{}
+	L      Locker
+	cnt    int
+	locker chan struct{}
 }
 
 // New returns a new Cond with Locker l.
 func New(l Locker) *Cond {
-	return &Cond{L: l}
+	queue := make(chan struct{}, 1)
+	locker := make(chan struct{}, 1)
+	locker <- struct{}{}
+	return &Cond{ch: queue, L: l, cnt: 0, locker: locker}
 }
 
 // Wait atomically unlocks c.L and suspends execution
@@ -38,7 +44,12 @@ func New(l Locker) *Cond {
 //	... make use of condition ...
 //	c.L.Unlock()
 func (c *Cond) Wait() {
-
+	<-c.locker
+	c.L.Unlock()
+	c.cnt++
+	c.locker <- struct{}{}
+	<-c.ch
+	c.L.Lock()
 }
 
 // Signal wakes one goroutine waiting on c, if there is any.
@@ -46,7 +57,12 @@ func (c *Cond) Wait() {
 // It is allowed but not required for the caller to hold c.L
 // during the call.
 func (c *Cond) Signal() {
-
+	<-c.locker
+	if c.cnt > 0 {
+		c.ch <- struct{}{}
+		c.cnt--
+	}
+	c.locker <- struct{}{}
 }
 
 // Broadcast wakes all goroutines waiting on c.
@@ -54,5 +70,10 @@ func (c *Cond) Signal() {
 // It is allowed but not required for the caller to hold c.L
 // during the call.
 func (c *Cond) Broadcast() {
-
+	<-c.locker
+	for i := 0; i < c.cnt; i++ {
+		c.ch <- struct{}{}
+	}
+	c.cnt = 0
+	c.locker <- struct{}{}
 }
