@@ -4,76 +4,72 @@ import "sync"
 
 type T struct {
 	main  chan struct{}
-	ch1   chan struct{}
-	ch2   chan struct{}
+	mu    chan struct{}
 	done  chan struct{}
 	flag1 bool
-	flag2 bool
-	wg    *sync.WaitGroup
+	wg1   *sync.WaitGroup
+	wg2   *sync.WaitGroup
 }
 
 func (t *T) Parallel() {
-	if t.ch2 != nil {
-		t.flag2 = true
-		t.ch2 <- struct{}{}
+	if t.wg2 != nil {
+		t.wg2.Done()
 		<-t.done
+		t.wg2.Add(1)
 	} else {
-		t.ch2 = make(chan struct{})
 		t.flag1 = true
 		t.main <- struct{}{}
-		<-t.ch1
+		<-t.mu
 	}
 }
 
 func (t *T) Run(subtest func(t *T)) {
-	t.wg.Add(1)
-	t.ch2 = ch
+	t.wg1.Add(1)
+	t.done = make(chan struct{})
+	tmp := t.done
+	var wg sync.WaitGroup
+	t.wg2 = &wg
+	wg.Add(1)
 
 	go func() {
 		subtest(t)
-		t.wg.Done()
-		if !t.flag2 {
-			ch <- struct{}{}
-		}
+		wg.Done()
+		close(tmp)
 	}()
 
-	<-ch
+	wg.Wait()
 }
 
 func Run(topTests []func(t *T)) {
 	main := make(chan struct{})
 	test := make([]*T, len(topTests))
-	var wg sync.WaitGroup
+	mu := make(chan struct{})
+	var wg1 sync.WaitGroup
 
 	for i, f := range topTests {
-		wg.Add(1)
+		wg1.Add(1)
 		test[i] = &T{
 			main:  main,
-			ch1:   make(chan struct{}, 1),
-			ch2:   nil,
+			mu:    mu,
 			flag1: false,
-			flag2: false,
-			wg:    &wg,
+			wg1:   &wg1,
 			done:  make(chan struct{}),
+			wg2:   nil,
 		}
 
 		go func(t *T) {
+			tmp := t.done
 			f(t)
-			close(t.done)
 			if !t.flag1 {
 				main <- struct{}{}
 			}
-			wg.Done()
+			close(tmp)
+			wg1.Done()
 		}(test[i])
 
 		<-main
 	}
 
-	for i := range test {
-		if test[i].flag1 {
-			test[i].ch1 <- struct{}{}
-		}
-	}
-
-	wg.Wait()
+	close(mu)
+	wg1.Wait()
 }
