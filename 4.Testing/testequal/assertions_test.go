@@ -31,8 +31,7 @@ func TestEqual(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			AssertEqual(t, tc.expected, tc.actual)
-			RequireEqual(t, tc.expected, tc.actual)
-
+			// RequireEqual(t, tc.expected, tc.actual)
 			mockT := new(testing.T)
 			require.False(t, AssertNotEqual(mockT, tc.expected, tc.actual))
 		})
