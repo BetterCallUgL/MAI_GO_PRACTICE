@@ -1,6 +1,7 @@
 package iprange
 
 import (
+	"bytes"
 	"net"
 	"testing"
 
@@ -169,4 +170,29 @@ func TestListExpansion(t *testing.T) {
 
 	expanded := rangeList.Expand()
 	assert.Len(t, expanded, 20)
+}
+
+func FuzzIpRange(f *testing.F) {
+	for _, line := range []string{"192.168.1.10, 192.168.1.1-20, 192.168.1.10/29", "192.168.10", "10.0.0.1, 10.0.0.5-10, 192.168.1.*", "192.168.10.0/24", "1.1.1.1/71"} {
+		f.Add(line)
+	}
+	f.Fuzz(func(t *testing.T, orig string) {
+		rangelist, err := ParseList(orig)
+		if err != nil {
+			t.Skip()
+		} else {
+			for _, ip := range rangelist {
+				if ip.Min.To4() == nil {
+					t.Errorf("%v is not an ip address", ip.Min.String())
+				}
+				if ip.Max.To4() == nil {
+					t.Errorf("%v is not an ip address", ip.Max.String())
+				}
+
+				if bytes.Compare(ip.Min, ip.Max) > 0 {
+					t.Errorf("%v is more than %v", ip.Min.String(), ip.Max.String())
+				}
+			}
+		}
+	})
 }
