@@ -1,4 +1,3 @@
-// nolint
 package iprange
 
 import (
@@ -403,29 +402,27 @@ ipdefault:
 			}
 			fallthrough
 
-		case 1, 2: /* incompletely recovered error ... try again */
+		case 1, 2:
 			Errflag = 3
 
-			/* find a state where "error" is a legal shift action */
 			for ipp >= 0 {
 				ipn = ipPact[ipS[ipp].yys] + ipErrCode
 				if ipn >= 0 && ipn < ipLast {
-					ipstate = ipAct[ipn] /* simulate a shift of "error" */
+					ipstate = ipAct[ipn]
 					if ipChk[ipstate] == ipErrCode {
 						goto ipstack
 					}
 				}
 
-				/* the current p has no shift on "error", pop stack */
 				if ipDebug >= 2 {
 					fmt.Printf("error recovery pops state %d\n", ipS[ipp].yys)
 				}
 				ipp--
 			}
-			/* there is no state on the stack with an error shift ... abort */
+
 			goto ret1
 
-		case 3: /* no shift yet; clobber input char */
+		case 3:
 			if ipDebug >= 2 {
 				fmt.Printf("error recovery discards %s\n", ipTokname(iptoken))
 			}
@@ -434,22 +431,20 @@ ipdefault:
 			}
 			iprcvr.char = -1
 			iptoken = -1
-			goto ipnewstate /* try again in the same state */
+			goto ipnewstate
 		}
 	}
 
-	/* reduction by production ipn */
 	if ipDebug >= 2 {
 		fmt.Printf("reduce %v in:\n\t%v\n", ipn, ipStatname(ipstate))
 	}
 
 	ipnt := ipn
 	ippt := ipp
-	_ = ippt // guard against "declared and not used"
+	_ = ippt
 
 	ipp -= ipR2[ipn]
-	// ipp is now the index of $0. Perform the default action. Iff the
-	// reduced production is ε, $1 is possibly out of range.
+
 	if ipp+1 >= len(ipS) {
 		nyys := make([]ipSymType, len(ipS)*2)
 		copy(nyys, ipS)
@@ -457,7 +452,6 @@ ipdefault:
 	}
 	ipVAL = ipS[ipp+1]
 
-	/* consult goto table to find next state */
 	ipn = ipR1[ipn]
 	ipg := ipPgo[ipn]
 	ipj := ipg + ipS[ipp].yys + 1
@@ -470,7 +464,7 @@ ipdefault:
 			ipstate = ipAct[ipg]
 		}
 	}
-	// dummy call; replaced with literal code
+
 	switch ipnt {
 
 	case 1:
@@ -521,7 +515,7 @@ ipdefault:
 			ipVAL.octRange = octetRange{ipDollar[1].num, ipDollar[1].num}
 		}
 	case 9:
-		// nolint
+
 		ipDollar = ipS[ippt-1 : ippt+1]
 		{
 			ipVAL.octRange = octetRange{0, 255}
@@ -537,5 +531,5 @@ ipdefault:
 			ipVAL.octRange = octetRange{ipDollar[1].num, ipDollar[3].num}
 		}
 	}
-	goto ipstack /* stack new state and value */
+	goto ipstack
 }
